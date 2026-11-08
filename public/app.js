@@ -437,7 +437,7 @@ async function renderCoach() {
   const reviews = S.me.ai ? await api("GET", "/reviews") : [];
   if (!fresh()) return;
   const off = !S.me.ai
-    ? `<div class="notice">AI reviews are off. Add your free Groq API key as the <b>GROQ_API_KEY</b> secret (see the setup guide).</div>` : "";
+    ? `<div class="notice">AI reviews are off. Add your OpenAI API key as the <b>OPENAI_API_KEY</b> secret (see the setup guide).</div>` : "";
   const buttons = S.me.ai ? `<div class="btn-row">
       <button type="button" class="btn" data-which="this">Review this week</button>
       <button type="button" class="btn ghost" data-which="last">Review last week</button></div>

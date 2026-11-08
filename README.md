@@ -20,7 +20,7 @@ RepWise is just a website. Open the link, log in and start logging.
 - **Everything in one place.** Workouts, cardio, diet with food photos, body weight and progress photos.
 - **A coach that reads your week.** Every Sunday an AI reviews your logs and gives you a few specific things to do next.
 - **Works in the gym.** With no signal, your log saves on the phone and uploads when you're back online.
-- **Free to run, and yours.** It runs on the free plans of Cloudflare and Groq, and your data stays in your own account.
+- **Almost free to run, and yours.** The site runs on Cloudflare's free plan, the AI coach uses your own OpenAI account at about a tenth of a cent per review, and your logs stay in your own Cloudflare account.
 
 ## Who can use it
 
@@ -45,7 +45,7 @@ Each RepWise site has one password and one log, so it's built for one person. If
 - Works offline in the gym: workouts save on the phone and upload when you're back online
 - Only you can log in. Photos are private and never sent to the AI.
 
-**Cost: $0/month.** Cloudflare's free plan covers the website, the database (5 GB) and photo storage (10 GB). Groq's free plan covers the AI.
+**Cost: $0/month for the site.** Cloudflare's free plan covers the website, the database (5 GB) and photo storage (10 GB). The AI coach is the only paid part: it uses your own OpenAI API credit, at about a tenth of a cent per weekly review.
 
 ---
 
@@ -61,10 +61,10 @@ If a button label in Cloudflare looks slightly different from what's written her
 
 ### 2. Create the database
 1. Sign up free at https://dash.cloudflare.com/sign-up and log in.
-2. In the left menu open **Storage & Databases → D1 SQL Database** and click **Create database**.
+2. In the left menu open **Storage & databases → D1 SQLite Database** and click **Create database**.
 3. Name it `repwise-db` and click **Create**.
 4. Copy the **Database ID** shown on the next page (it looks like `a1b2c3d4-5678-...`).
-5. Back on GitHub, open `wrangler.jsonc`, click the **pencil** icon to edit, and replace `PASTE-YOUR-DATABASE-ID-HERE` with your ID. Keep the quotes. Click **Commit changes**.
+5. Back on GitHub, open `wrangler.jsonc`, click the **pencil** icon to edit, and replace the `database_id` value with your ID. Keep the quotes. Click **Commit changes**.
 
 You don't need to create any tables. The app creates them the first time it runs.
 
@@ -86,7 +86,7 @@ In your `repwise` Worker, open **Settings → Variables and Secrets** and add th
 |---|---|
 | `APP_PASSWORD` | The password you'll log in with. Make it long. |
 | `SESSION_SECRET` | Any long random text, at least 32 characters. Mash the keyboard or use a password generator. |
-| `GROQ_API_KEY` | Sign up free at https://console.groq.com, open **API Keys**, create a key and paste it here. Skip this if you don't want AI reviews. |
+| `OPENAI_API_KEY` | Create a key at https://platform.openai.com/api-keys and paste it here. The account needs some API credit. Skip this if you don't want AI reviews. |
 
 Click **Deploy** (or **Save and deploy**) after adding them.
 
@@ -140,7 +140,7 @@ Data you log here is stored only on your laptop (in the hidden `.wrangler` folde
 Edit files directly on GitHub (pencil icon) and commit. Cloudflare redeploys automatically in about a minute.
 
 - **Review day/time:** `"crons"` in `wrangler.jsonc`. Times are UTC, so subtract 5:30 from IST (9 pm IST is `30 15 * * SUN`).
-- **AI model:** `"GROQ_MODEL"` in `wrangler.jsonc`.
+- **AI model:** `"OPENAI_MODEL"` in `wrangler.jsonc`.
 - **Change password:** edit the `APP_PASSWORD` secret in Cloudflare. This also logs every device out.
 - **Log everyone out:** change `SESSION_SECRET`.
 
@@ -153,7 +153,8 @@ Edit files directly on GitHub (pencil icon) and commit. Cloudflare redeploys aut
 | Deploy fails mentioning R2 or the bucket | Enable R2 and create the `repwise-photos` bucket (step 3). |
 | Deploy fails about the name | The Cloudflare project must be called `repwise`. |
 | "The exercise list didn't load" | GitHub may be briefly down. Tap **Try again** in a minute. Your recent exercises still work. |
-| "AI reviews are off" | Add `GROQ_API_KEY` (step 5). |
+| "AI reviews are off" | Add `OPENAI_API_KEY` (step 5). |
+| "Your OpenAI credit or spending limit has run out" | Add credit in your OpenAI account, or raise its spending limit. |
 | "Too many wrong passwords" | Wait 15 minutes. |
 
 To see server errors, open your Worker in Cloudflare and go to **Logs**.
@@ -171,7 +172,7 @@ wrangler.jsonc   Cloudflare settings
 
 Exercise photos and instructions come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), released into the public domain under The Unlicense, so they can be used in commercial products. The app downloads them once and keeps a copy in your own storage.
 
-Free-plan limits can change. Check https://developers.cloudflare.com/workers/platform/pricing/ and https://console.groq.com/docs/rate-limits if something stops working.
+Free-plan limits and prices can change. Check https://developers.cloudflare.com/workers/platform/pricing/ and https://developers.openai.com/api/docs/models/gpt-6-luna if something stops working.
 
 ## License
 

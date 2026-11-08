@@ -3,5 +3,5 @@
 
 APP_PASSWORD=change-me
 SESSION_SECRET=type-any-long-random-text-here-at-least-32-characters
-# Optional: your free key from https://console.groq.com to test AI reviews locally
-GROQ_API_KEY=
+# Optional: your key from https://platform.openai.com/api-keys to test AI reviews locally
+OPENAI_API_KEY=

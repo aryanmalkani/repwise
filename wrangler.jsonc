@@ -17,7 +17,7 @@
     {
       "binding": "DB",
       "database_name": "repwise-db",
-      "database_id": "PASTE-YOUR-DATABASE-ID-HERE"
+      "database_id": "14b24ec6-ac5d-479c-be97-d19819babc9b"
     }
   ],
 
@@ -33,8 +33,8 @@
   "vars": {
     // Your time zone (India Standard Time), used to decide which week a review covers.
     "TIMEZONE": "Asia/Kolkata",
-    // Groq model for the weekly review.
-    "GROQ_MODEL": "openai/gpt-oss-120b"
+    // OpenAI model for the weekly review.
+    "OPENAI_MODEL": "gpt-6-luna"
   },
 
   // Weekly AI review: every Sunday at 9:00 pm IST.

@@ -2,16 +2,16 @@
 // Serves the API under /api/*; the website files in /public are served by Cloudflare automatically.
 //
 // Bindings (see wrangler.jsonc): DB (D1), PHOTOS (R2), ASSETS (static files)
-// Secrets: APP_PASSWORD, SESSION_SECRET, GROQ_API_KEY (optional, for AI reviews)
-// Vars: TIMEZONE (e.g. "Asia/Kolkata"), GROQ_MODEL
+// Secrets: APP_PASSWORD, SESSION_SECRET, OPENAI_API_KEY (optional, for AI reviews)
+// Vars: TIMEZONE (e.g. "Asia/Kolkata"), OPENAI_MODEL
 
 const SESSION_COOKIE = "gl_session";
 const SESSION_DAYS = 60;
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_FAILS = 8;
-const DEFAULT_MODEL = "openai/gpt-oss-120b";
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const DEFAULT_MODEL = "gpt-6-luna";
+const OPENAI_URL = "https://api.openai.com/v1/responses";
 const LB_PER_KG = 2.20462262;
 const CLIENT_ID_RE = /^[A-Za-z0-9-]{8,64}$/;
 
@@ -836,43 +836,55 @@ Rules:
 - Give 2–4 specific, doable actions for next week.
 - No medical diagnoses. If something looks risky (very low calories, sharp weight change, pain in notes), suggest checking with a professional.`;
 
-async function callGroq(env, summary) {
-  const model = env.GROQ_MODEL || DEFAULT_MODEL;
+async function callOpenAI(env, summary) {
+  const model = env.OPENAI_MODEL || DEFAULT_MODEL;
   const base = {
     model,
-    temperature: 0.5,
-    max_completion_tokens: 1400,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: "Here is my log for the week as JSON:\n" + JSON.stringify(summary) },
-    ],
+    instructions: SYSTEM_PROMPT,
+    input: "Here is my log for the week as JSON:\n" + JSON.stringify(summary),
+    max_output_tokens: 2500, // covers the model's reasoning as well as the review itself
+    store: false, // health logs aren't kept on OpenAI's servers as stored responses
   };
   const attempt = (body) =>
-    fetch(GROQ_URL, {
+    fetch(OPENAI_URL, {
       method: "POST",
-      headers: { authorization: `Bearer ${env.GROQ_API_KEY}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
 
-  let res = await attempt({ ...base, reasoning_effort: "low" });
-  if (res.status === 400) res = await attempt(base); // model doesn't support reasoning_effort
+  let res = await attempt({ ...base, reasoning: { effort: "low" } });
+  if (res.status === 400) res = await attempt(base); // the chosen model doesn't support reasoning settings
   if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
-    if (res.status === 429) throw new HttpError(429, "The AI's free limit was hit. Try again in a minute.");
-    if (res.status === 401) throw new HttpError(502, "The Groq API key was rejected. Check the GROQ_API_KEY secret.");
-    throw new HttpError(502, `The AI service returned an error (${res.status}): ${detail}`);
+    const raw = await res.text();
+    let err = {};
+    try {
+      err = JSON.parse(raw).error || {};
+    } catch {}
+    if (res.status === 401) throw new HttpError(502, "OpenAI rejected the API key. Check the OPENAI_API_KEY secret.");
+    if (res.status === 429) {
+      const outOfCredit = err.type === "insufficient_quota" || /credit|spend_limit|usage_limit/.test(err.code || "");
+      throw new HttpError(429, outOfCredit ? "Your OpenAI credit or spending limit has run out. Add credit in your OpenAI account, then try again." : "OpenAI is busy right now. Try again in a minute.");
+    }
+    throw new HttpError(502, `The AI service returned an error (${res.status}): ${err.message || raw.slice(0, 300)}`);
   }
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new HttpError(502, "The AI returned an empty review. Try again.");
+  const content = (data.output || [])
+    .filter((item) => item.type === "message")
+    .flatMap((item) => item.content || [])
+    .filter((part) => part.type === "output_text")
+    .map((part) => part.text)
+    .join("")
+    .trim();
+  // A half-finished review shouldn't replace a good one.
+  if (!content || data.incomplete_details) throw new HttpError(502, "The AI didn't finish the review. Try again.");
   return { content, model };
 }
 
 async function generateReview(env, start) {
-  if (!env.GROQ_API_KEY) throw new HttpError(400, "AI reviews are off. Add the GROQ_API_KEY secret to turn them on.");
+  if (!env.OPENAI_API_KEY) throw new HttpError(400, "AI reviews are off. Add the OPENAI_API_KEY secret to turn them on.");
   const { end, summary, empty } = await buildWeekSummary(env, start);
   if (empty) throw new HttpError(400, "Nothing is logged for that week yet.");
-  const { content, model } = await callGroq(env, summary);
+  const { content, model } = await callOpenAI(env, summary);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM reviews WHERE week_start = ?").bind(start),
     env.DB.prepare("INSERT INTO reviews (week_start, week_end, content, model) VALUES (?, ?, ?, ?)").bind(start, end, content, model),
@@ -921,8 +933,8 @@ async function handleApi(request, env, url) {
   if (path === "/me" && method === "GET") {
     return json({
       ok: true,
-      ai: !!env.GROQ_API_KEY,
-      model: env.GROQ_MODEL || DEFAULT_MODEL,
+      ai: !!env.OPENAI_API_KEY,
+      model: env.OPENAI_MODEL || DEFAULT_MODEL,
       timezone: env.TIMEZONE || "UTC",
       settings: await getSettings(env),
     });
@@ -1038,7 +1050,7 @@ export default {
 
   // Runs on the schedule in wrangler.jsonc (Sunday evening) and reviews the week that's ending.
   async scheduled(event, env, ctx) {
-    if (!env.GROQ_API_KEY) return;
+    if (!env.OPENAI_API_KEY) return;
     const start = weekStart(todayIn(env.TIMEZONE));
     ctx.waitUntil(
       ensureSchema(env)
