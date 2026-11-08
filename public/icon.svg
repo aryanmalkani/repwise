@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22272E"/>
+      <stop offset="1" stop-color="#121417"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F1F3F5"/>
+      <stop offset="1" stop-color="#9AA1A8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.62" cy="0.38" r="0.6">
+      <stop offset="0" stop-color="#F0384F" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#F0384F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <!-- one end of a loaded barbell, tilted upward like a rising chart -->
+  <g transform="rotate(-22 256 256)">
+    <rect x="70" y="248" width="300" height="16" rx="8" fill="url(#bar)"/>
+    <rect x="150" y="240" width="22" height="32" rx="5" fill="#C9CED4"/>
+    <rect x="182" y="132" width="44" height="248" rx="14" fill="#F0384F"/>
+    <rect x="234" y="152" width="40" height="208" rx="13" fill="#5592F7"/>
+    <rect x="282" y="176" width="36" height="160" rx="12" fill="#F2BE2E"/>
+    <rect x="326" y="200" width="32" height="112" rx="11" fill="#3DBF74"/>
+    <rect x="364" y="242" width="78" height="28" rx="10" fill="url(#bar)"/>
+    <g fill="#FFFFFF" opacity="0.18">
+      <rect x="188" y="140" width="8" height="232" rx="4"/>
+      <rect x="240" y="160" width="7" height="192" rx="3.5"/>
+      <rect x="288" y="184" width="6" height="144" rx="3"/>
+      <rect x="331" y="207" width="6" height="98" rx="3"/>
+    </g>
+  </g>
+</svg>

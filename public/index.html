@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>RepWise</title>
+  <meta name="description" content="Workout, nutrition and progress tracker with an AI weekly coach." />
+  <meta name="theme-color" content="#F2F3F1" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#15171A" media="(prefers-color-scheme: dark)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="RepWise" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <main id="view" tabindex="-1" aria-live="polite"></main>
+
+    <nav id="tabbar" aria-label="Main" hidden>
+      <a href="#/" data-tab="today">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1z"/></svg>
+        <span>Today</span>
+      </a>
+      <a href="#/history" data-tab="history">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>
+        <span>History</span>
+      </a>
+      <button type="button" id="logBtn" aria-label="Log something">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <a href="#/photos" data-tab="photos">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="14" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 5.5 10 3.5h4l1.5 2"/></svg>
+        <span>Photos</span>
+      </a>
+      <a href="#/coach" data-tab="coach">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5V6a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 6v9a1.5 1.5 0 0 1-1.5 1.5H8z"/><path d="M8 9h8M8 12.5h5"/></svg>
+        <span>Coach</span>
+      </a>
+    </nav>
+  </div>
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div>
+  </div>
+
+  <a id="wkbar" href="#/workout" hidden>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="main"><b>Workout in progress</b><span id="wkbarTime">0:00</span></span>
+    <span class="go">Resume</span>
+  </a>
+
+  <div id="restbar" role="timer" aria-live="off" hidden>
+    <span class="rb-fill" aria-hidden="true"></span>
+    <span class="rb-label">Rest</span>
+    <b class="rb-time">1:30</b>
+    <button type="button" data-rb="-15" aria-label="15 seconds less">−15</button>
+    <button type="button" data-rb="15" aria-label="15 seconds more">+15</button>
+    <button type="button" data-rb="skip">Skip</button>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "files.associations": { "wrangler.jsonc": "jsonc", ".dev.vars*": "properties" },
+  "editor.tabSize": 2,
+  "editor.formatOnSave": false,
+  "files.eol": "\n",
+  "files.exclude": { ".wrangler": true },
+  "search.exclude": { "node_modules": true, ".wrangler": true }
+}

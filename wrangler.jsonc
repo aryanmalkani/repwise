@@ -1,0 +1,47 @@
+{
+  // Cloudflare config for RepWise. See README.md for the setup steps.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "repwise",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+
+  // The website (HTML/CSS/JS) in /public. /api/* requests go to the worker.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // Database for your logs. Paste the database_id printed by:
+  //   npx wrangler d1 create repwise-db
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "repwise-db",
+      "database_id": "PASTE-YOUR-DATABASE-ID-HERE"
+    }
+  ],
+
+  // Private photo storage. Created with:
+  //   npx wrangler r2 bucket create repwise-photos
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "repwise-photos"
+    }
+  ],
+
+  "vars": {
+    // Your time zone (India Standard Time), used to decide which week a review covers.
+    "TIMEZONE": "Asia/Kolkata",
+    // Groq model for the weekly review.
+    "GROQ_MODEL": "openai/gpt-oss-120b"
+  },
+
+  // Weekly AI review: every Sunday at 9:00 pm IST.
+  // Cron times are in UTC: 15:30 UTC = 21:00 IST.
+  "triggers": {
+    "crons": ["30 15 * * SUN"]
+  },
+
+  "observability": { "enabled": true }
+}

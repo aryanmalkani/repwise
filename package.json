@@ -1,0 +1,16 @@
+{
+  "name": "repwise",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RepWise: workout, nutrition and progress tracker with an AI weekly coach. Runs free on Cloudflare.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "logs": "wrangler tail",
+    "db:init": "wrangler d1 execute repwise-db --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+# Local settings for "npm run dev". Copy this file to .dev.vars and fill it in.
+# .dev.vars stays on your laptop: it's listed in .gitignore, so it never goes to GitHub.
+
+APP_PASSWORD=change-me
+SESSION_SECRET=type-any-long-random-text-here-at-least-32-characters
+# Optional: your free key from https://console.groq.com to test AI reviews locally
+GROQ_API_KEY=
