@@ -2,7 +2,7 @@
 // Serves the API under /api/*; the website files in /public are served by Cloudflare automatically.
 //
 // Bindings (see wrangler.jsonc): DB (D1), PHOTOS (R2), ASSETS (static files)
-// Secrets: APP_PASSWORD, SESSION_SECRET, OPENAI_API_KEY (optional, for AI reviews)
+// Secrets: APP_USERNAME, APP_PASSWORD, SESSION_SECRET, OPENAI_API_KEY (optional, for AI reviews)
 // Vars: TIMEZONE (e.g. "Asia/Kolkata"), OPENAI_MODEL
 
 const SESSION_COOKIE = "gl_session";
@@ -175,8 +175,9 @@ function ensureSchema(env) {
 
 // ---------- auth ----------
 
-// Sessions are signed with the password too, so changing the password logs every device out.
-const sessionKey = (env) => `${env.SESSION_SECRET}:${env.APP_PASSWORD}`;
+// Sessions are signed with the login too, so changing the username or password logs every device out.
+const sessionKey = (env) => `${env.SESSION_SECRET}:${env.APP_USERNAME}:${env.APP_PASSWORD}`;
+const normalUsername = (s) => String(s || "").trim().toLowerCase(); // phones often capitalise the first letter
 
 async function makeSession(env) {
   const exp = Date.now() + SESSION_DAYS * 864e5;
@@ -205,19 +206,20 @@ async function handleLogin(request, env) {
     .bind(ip, now - LOGIN_WINDOW_MS)
     .first();
   if ((recent?.n || 0) >= LOGIN_MAX_FAILS) {
-    return fail(429, "Too many wrong passwords. Wait 15 minutes and try again.");
+    return fail(429, "Too many failed logins. Wait 15 minutes and try again.");
   }
 
   const body = await readJson(request);
-  const given = String(body.password || "");
-  const a = await hmac(env.SESSION_SECRET, "pw:" + given);
-  const b = await hmac(env.SESSION_SECRET, "pw:" + env.APP_PASSWORD);
-  if (!safeEqual(a, b)) {
+  // Compared through HMAC so the time taken doesn't reveal how much of either matched.
+  const same = async (given, expected) => safeEqual(await hmac(env.SESSION_SECRET, "login:" + given), await hmac(env.SESSION_SECRET, "login:" + expected));
+  const userOk = await same(normalUsername(body.username), normalUsername(env.APP_USERNAME));
+  const passOk = await same(String(body.password || ""), env.APP_PASSWORD);
+  if (!userOk || !passOk) {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO login_attempts (ip, at) VALUES (?, ?)").bind(ip, now),
       env.DB.prepare("DELETE FROM login_attempts WHERE at < ?").bind(now - 864e5),
     ]);
-    return fail(401, "Wrong password.");
+    return fail(401, "Wrong username or password.");
   }
   await env.DB.prepare("DELETE FROM login_attempts WHERE ip = ?").bind(ip).run();
   return json({ ok: true }, 200, { "set-cookie": sessionCookie(await makeSession(env), SESSION_DAYS * 86400) });
@@ -958,8 +960,8 @@ async function handleApi(request, env, url) {
   const path = url.pathname.replace(/^\/api/, "") || "/";
   const method = request.method;
 
-  if (!env.APP_PASSWORD || !env.SESSION_SECRET) {
-    return fail(500, "Setup isn't finished: add the APP_PASSWORD and SESSION_SECRET secrets, then deploy again.");
+  if (!env.APP_USERNAME || !env.APP_PASSWORD || !env.SESSION_SECRET) {
+    return fail(500, "Setup isn't finished: add the APP_USERNAME, APP_PASSWORD and SESSION_SECRET secrets, then deploy again.");
   }
 
   // Requests that change data must come from the app itself (blocks cross-site form posts).

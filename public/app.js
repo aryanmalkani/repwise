@@ -829,7 +829,7 @@ function showLogin() {
     <img class="login-art" src="/gym.svg" alt="" width="800" height="520">
     <div><h1>RepWise</h1><p>Log every set, track every meal, and get a coach's read on your week.</p></div>
     <form id="login">
-      <input type="text" name="username" value="me" autocomplete="username" hidden>
+      <label class="field"><span>Username</span><input type="text" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
       <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required></label>
       <button class="btn block" type="submit">Log in</button>
     </form></div>`;
@@ -838,7 +838,7 @@ function showLogin() {
     const btn = $("button", ev.target);
     btn.disabled = true;
     try {
-      await api("POST", "/login", { password: ev.target.password.value });
+      await api("POST", "/login", { username: ev.target.username.value, password: ev.target.password.value });
       await boot();
     } catch (e) {
       toast(e.message, true);

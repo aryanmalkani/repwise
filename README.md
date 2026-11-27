@@ -81,10 +81,11 @@ You don't need to create any tables. The app creates them the first time it runs
 4. When it finishes, it shows your site address, like `https://repwise.yourname.workers.dev`.
 
 ### 5. Set your password and AI key
-In your `repwise` Worker, open **Settings → Variables and Secrets** and add these three, each with type **Secret**:
+In your `repwise` Worker, open **Settings → Variables and Secrets** and add these four, each with type **Secret**:
 
 | Name | Value |
 |---|---|
+| `APP_USERNAME` | The username you'll log in with. Capital letters don't matter. |
 | `APP_PASSWORD` | The password you'll log in with. Make it long. |
 | `SESSION_SECRET` | Any long random text, at least 32 characters. Mash the keyboard or use a password generator. |
 | `OPENAI_API_KEY` | Create a key at https://platform.openai.com/api-keys and paste it here. The account needs some API credit. Skip this if you don't want AI reviews. |
@@ -111,7 +112,7 @@ You need [Git](https://git-scm.com/download/win), [Node.js LTS](https://nodejs.o
 **Run RepWise on your laptop**
 1. In VS Code: **File → Open Folder** and pick the `repwise` folder. Click **Yes, I trust the authors**.
 2. Open the terminal with **Ctrl + `** and run `npm install`.
-3. Copy `.dev.vars.example` to a new file named `.dev.vars` and set a password in it.
+3. Copy `.dev.vars.example` to a new file named `.dev.vars` and set a username and password in it.
 4. Run `npm run dev`, then open http://localhost:8787 in your browser and log in.
 
 Data you log here is stored only on your laptop (in the hidden `.wrangler` folder), separate from your real app. Press **Ctrl + C** in the terminal to stop.
@@ -143,21 +144,21 @@ Edit files directly on GitHub (pencil icon) and commit. Cloudflare redeploys aut
 
 - **Review day/time:** `"crons"` in `wrangler.jsonc`. Times are UTC, so subtract 5:30 from IST (9 pm IST is `30 15 * * SUN`).
 - **AI model:** `"OPENAI_MODEL"` in `wrangler.jsonc`.
-- **Change password:** edit the `APP_PASSWORD` secret in Cloudflare. This also logs every device out.
+- **Change username or password:** edit the `APP_USERNAME` or `APP_PASSWORD` secret in Cloudflare. This also logs every device out.
 - **Log everyone out:** change `SESSION_SECRET`.
 
 ## Troubleshooting
 
 | What you see | Fix |
 |---|---|
-| "Setup isn't finished" | Add `APP_PASSWORD` and `SESSION_SECRET` (step 5), then deploy again. |
+| "Setup isn't finished" | Add `APP_USERNAME`, `APP_PASSWORD` and `SESSION_SECRET` (step 5), then deploy again. |
 | Deploy fails mentioning the database | Check the Database ID in `wrangler.jsonc` (step 2). |
 | Deploy fails mentioning R2 or the bucket | Enable R2 and create the `repwise-photos` bucket (step 3). |
 | Deploy fails about the name | The Cloudflare project must be called `repwise`. |
 | "The exercise list didn't load" | GitHub may be briefly down. Tap **Try again** in a minute. Your recent exercises still work. |
 | "AI reviews are off" | Add `OPENAI_API_KEY` (step 5). |
 | "Your OpenAI credit or spending limit has run out" | Add credit in your OpenAI account, or raise its spending limit. |
-| "Too many wrong passwords" | Wait 15 minutes. |
+| "Too many failed logins" | Wait 15 minutes. |
 
 To see server errors, open your Worker in Cloudflare and go to **Logs**.
 
