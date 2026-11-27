@@ -125,6 +125,8 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date)`,
   `CREATE TABLE IF NOT EXISTS body (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, weight REAL, body_fat REAL, waist_cm REAL, photo_key TEXT, notes TEXT, client_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
   `CREATE INDEX IF NOT EXISTS idx_body_date ON body(date)`,
+  `CREATE TABLE IF NOT EXISTS coding (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, activity TEXT NOT NULL DEFAULT 'practice', topic TEXT, minutes REAL NOT NULL, problems INTEGER, link TEXT, notes TEXT, client_id TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
+  `CREATE INDEX IF NOT EXISTS idx_coding_date ON coding(date)`,
   `CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, week_start TEXT NOT NULL, week_end TEXT NOT NULL, content TEXT NOT NULL, model TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`,
   `CREATE INDEX IF NOT EXISTS idx_reviews_week ON reviews(week_start)`,
   `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
@@ -159,7 +161,7 @@ function ensureSchema(env) {
       });
       stmts.push(env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_lifts_workout ON lifts(workout_id)"));
       stmts.push(env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_lifts_key ON lifts(exercise_id, exercise)"));
-      for (const t of ["workouts", "cardio", "meals", "body"]) {
+      for (const t of ["workouts", "cardio", "meals", "body", "coding"]) {
         stmts.push(env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${t}_client ON ${t}(client_id)`));
       }
       await env.DB.batch(stmts);
@@ -232,6 +234,7 @@ async function readJson(request) {
 // ---------- simple entry types (cardio, meals, body) ----------
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
+const CODING_ACTIVITIES = ["learn", "practice", "build"]; // learning | practice problems | project work
 
 const TYPES = {
   cardio: {
@@ -286,6 +289,22 @@ const TYPES = {
       return out;
     },
   },
+  coding: {
+    columns: ["date", "activity", "topic", "minutes", "problems", "link", "notes"],
+    clean(b) {
+      const minutes = num(b.minutes, { min: 0, max: 1440 });
+      if (!minutes) throw new HttpError(400, "Add how many minutes you coded.");
+      const problems = num(b.problems, { min: 0, max: 1000 });
+      return {
+        activity: CODING_ACTIVITIES.includes(b.activity) ? b.activity : "practice",
+        topic: text(b.topic, 120),
+        minutes,
+        problems: problems === null ? null : Math.round(problems),
+        link: cleanLink(b.link),
+        notes: text(b.notes, 2000),
+      };
+    },
+  },
 };
 
 const PHOTO_KEY_RE = /^(meal|body)\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
@@ -297,6 +316,14 @@ function cleanPhotoKey(k) {
 }
 
 const cleanClientId = (v) => (typeof v === "string" && CLIENT_ID_RE.test(v) ? v : null);
+
+// Only web links, so a saved link can't run script when it's opened.
+function cleanLink(v) {
+  const s = text(v, 500);
+  if (!s) return null;
+  if (!/^https?:\/\/\S+$/i.test(s)) throw new HttpError(400, "Links must start with http:// or https://.");
+  return s;
+}
 
 async function createEntry(env, type, body) {
   const def = TYPES[type];
@@ -541,7 +568,7 @@ async function listRange(env, from, to) {
 
 // ---------- settings ----------
 
-const SETTING_KEYS = ["goal", "calorie_target", "protein_target", "unit", "bodyweight_goal"];
+const SETTING_KEYS = ["goal", "calorie_target", "protein_target", "unit", "bodyweight_goal", "coding_goal"];
 
 async function getSettings(env) {
   const { results } = await env.DB.prepare("SELECT key, value FROM settings").all();
@@ -794,6 +821,20 @@ async function buildWeekSummary(env, start) {
     progress_photos_taken: bodyWeek.filter((b) => b.photo_key).length,
   };
 
+  // Coding
+  const hours = (rows) => round(rows.reduce((t, c) => t + (c.minutes || 0), 0) / 60);
+  const coding = week.coding.length
+    ? {
+        sessions: week.coding.length,
+        days_coded: new Set(week.coding.map((c) => c.date)).size,
+        hours: hours(week.coding),
+        hours_by_activity: Object.fromEntries(CODING_ACTIVITIES.map((a) => [a, hours(week.coding.filter((c) => c.activity === a))]).filter(([, h]) => h)),
+        problems_solved: week.coding.reduce((t, c) => t + (c.problems || 0), 0),
+        topics: [...new Set(week.coding.map((c) => c.topic).filter(Boolean))].slice(0, 8),
+        prev_4wk_avg_hours_per_week: round(hours(hist.coding) / 4),
+      }
+    : "not logged";
+
   const trainingDays = new Set([...week.workouts.map((w) => w.date), ...week.cardio.map((c) => c.date)]);
   const histTrainingDays = new Set([...hist.workouts.map((w) => w.date), ...hist.cardio.map((c) => c.date)]);
 
@@ -805,6 +846,7 @@ async function buildWeekSummary(env, start) {
       calorie_target: settings.calorie_target || "not set",
       protein_target_g: settings.protein_target || "not set",
       bodyweight_goal: settings.bodyweight_goal || "not set",
+      coding_goal_hours_per_week: settings.coding_goal || "not set",
     },
     training_days: trainingDays.size,
     prev_4wk_avg_training_days_per_week: round(histTrainingDays.size / 4),
@@ -815,8 +857,9 @@ async function buildWeekSummary(env, start) {
     diet_days_logged: diet.length,
     diet,
     body,
+    python_coding: coding,
   };
-  const empty = !week.workouts.length && !week.cardio.length && !week.meals.length && !week.body.length;
+  const empty = !week.workouts.length && !week.cardio.length && !week.meals.length && !week.body.length && !week.coding.length;
   return { start, end, summary, empty };
 }
 
@@ -834,6 +877,7 @@ Rules:
 - If something wasn't logged (for example no calories counted), say so briefly instead of guessing.
 - Relate advice to their stated goal and targets when set.
 - Give 2–4 specific, doable actions for next week.
+- They also log Python coding practice. If any was logged, add one short bullet about it under Wins or Next week, compared with their coding goal and previous weeks. Keep everything else about training and nutrition.
 - No medical diagnoses. If something looks risky (very low calories, sharp weight change, pain in notes), suggest checking with a professional.`;
 
 async function callOpenAI(env, summary) {
@@ -971,6 +1015,11 @@ async function handleApi(request, env, url) {
 
   if (path === "/body-history" && method === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM body ORDER BY date ASC, id ASC LIMIT 3000").all();
+    return json(results || []);
+  }
+
+  if (path === "/coding-history" && method === "GET") {
+    const { results } = await env.DB.prepare("SELECT date, minutes, problems, activity FROM coding ORDER BY date ASC, id ASC LIMIT 10000").all();
     return json(results || []);
   }
 

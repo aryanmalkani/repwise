@@ -343,8 +343,10 @@ export const TYPE = {
   cardio: { name: "Cardio", color: "var(--cardio)", cls: "t-cardio" },
   meals: { name: "Meal", color: "var(--diet)", cls: "t-meals" },
   body: { name: "Body", color: "var(--body)", cls: "t-body" },
+  coding: { name: "Coding", color: "var(--code)", cls: "t-coding" },
 };
 export const MEAL_NAMES = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner", snack: "Snack" };
+export const CODING_NAMES = { learn: "Learning", practice: "Practice", build: "Project work" };
 
 const svg = (d, extra = "") => `<svg viewBox="0 0 24 24" aria-hidden="true"${extra}>${d}</svg>`;
 export const ICON = {

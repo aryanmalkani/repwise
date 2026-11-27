@@ -1,9 +1,9 @@
 // RepWise — screens and navigation. No build step, no libraries.
 import {
-  $, $$, esc, fmt, today, parseYmd, addDays, mondayOf, fmtDay, fmtShort, fmtClock, S, unit, store,
+  $, $$, esc, fmt, today, parseYmd, addDays, mondayOf, fmtDay, fmtShort, fmtClock, fmtMinutes, toNum, S, unit, store,
   api, OfflineError, ApiError, setUnauthorizedHandler, loadExercises, getQ, setQ, getFailed, setFailed, dropFailed,
   newClientId, claimView, currentView, toast, openSheet, closeSheet, initSheet, initDateFields, dateField, holdBack, releaseBack,
-  choose, confirmSheet, TYPE, MEAL_NAMES, ICON, lineChart, md,
+  choose, confirmSheet, TYPE, MEAL_NAMES, CODING_NAMES, ICON, lineChart, md,
 } from "./core.js";
 import {
   startWorkout, reopenWorkout, activeWorkout, renderLiveWorkout, renderWorkoutDetail, renderWorkoutEdit, setRouteKind,
@@ -13,6 +13,13 @@ import {
 const view = $("#view");
 const tabbar = $("#tabbar");
 const CARDIO_PRESETS = ["Run", "Walk", "Cycle", "Incline walk", "Rower", "Stairs", "Swim", "Elliptical", "HIIT", "Sport"];
+// Suggestions for the coding topic box. Anything else can be typed.
+const PY_TOPICS = [
+  "Basics", "Data types", "Strings", "Lists and dictionaries", "Loops", "Functions", "Files", "Error handling",
+  "Classes and OOP", "Modules and packages", "Comprehensions", "Decorators", "Generators", "Recursion",
+  "Data structures and algorithms", "NumPy", "pandas", "Matplotlib", "Web scraping", "APIs and requests",
+  "Flask", "Django", "FastAPI", "SQL and databases", "Testing", "Machine learning", "Automation scripts",
+];
 
 initSheet();
 initDateFields();
@@ -81,7 +88,11 @@ setInterval(flushQueue, 60000); // a weak signal may never fire the "online" eve
 // ---------- uploads the server rejected ----------
 
 const queuedType = (item) => (item.path ? item.path.split("/").pop() : item.type);
-const queuedLabel = (item) => `${item.data.name || item.data.activity || item.data.description || TYPE[queuedType(item)].name}, ${fmtShort(item.data.date)}`;
+const queuedLabel = (item) => {
+  const type = queuedType(item), d = item.data;
+  const what = type === "coding" ? d.topic || CODING_NAMES[d.activity] : d.name || d.activity || d.description;
+  return `${what || TYPE[type].name}, ${fmtShort(d.date)}`;
+};
 
 function fixFailed(item) {
   const type = queuedType(item);
@@ -116,6 +127,7 @@ $("#logBtn").addEventListener("click", () => {
       <a class="choice t-cardio" href="#/log/cardio"><b>Cardio</b><span>Runs, rides, walks</span></a>
       <a class="choice t-meals" href="#/log/meals"><b>Diet</b><span>Food photos, calories, protein</span></a>
       <a class="choice t-body" href="#/log/body"><b>Body</b><span>Weight and progress photo</span></a>
+      <a class="choice t-coding wide" href="#/log/coding"><b>Coding</b><span>Python learning, practice and projects</span></a>
     </div>`);
   $("[data-start]", panel).addEventListener("click", () => { closeSheet(true); startWorkout(); });
 });
@@ -139,6 +151,11 @@ function rowHtml(type, e) {
     meta.push(MEAL_NAMES[e.meal]);
     if (e.protein_g != null) meta.push(`${fmt(e.protein_g, 0)} g protein`);
     val = e.calories != null ? `${fmt(e.calories, 0)} kcal` : "";
+  } else if (type === "coding") {
+    title = e.topic || CODING_NAMES[e.activity] || "Coding";
+    if (e.topic) meta.push(CODING_NAMES[e.activity] || "Coding");
+    if (e.problems) meta.push(`${fmt(e.problems, 0)} ${e.problems === 1 ? "problem" : "problems"} solved`);
+    val = fmtMinutes((e.minutes || 0) * 60);
   } else {
     title = e.weight != null ? "Weigh-in" : e.photo_key ? "Progress photo" : "Measurements";
     if (e.body_fat != null) meta.push(`${fmt(e.body_fat)}% body fat`);
@@ -160,7 +177,7 @@ function flatten(data, filter = "all") {
     if (filter !== "all" && filter !== type) continue;
     for (const e of data[type] || []) out.push({ type, e });
   }
-  const order = { workouts: 0, cardio: 1, meals: 2, body: 3 };
+  const order = { workouts: 0, cardio: 1, meals: 2, body: 3, coding: 4 };
   out.sort((a, b) => b.e.date.localeCompare(a.e.date) || order[a.type] - order[b.type] || b.e.id - a.e.id);
   return out;
 }
@@ -203,7 +220,7 @@ async function renderToday() {
   const days = [...Array(7)].map((_, i) => addDays(start, i));
   const has = (type, d) => (week[type] || []).some((e) => e.date === d);
   const plates = (d) => {
-    const p = ["workouts", "cardio", "meals", "body"].filter((tp) => has(tp, d)).map((tp, i) => `<i class="plate ${tp}" style="animation-delay:${i * 60}ms"></i>`);
+    const p = ["workouts", "cardio", "meals", "body", "coding"].filter((tp) => has(tp, d)).map((tp, i) => `<i class="plate ${tp}" style="animation-delay:${i * 60}ms"></i>`);
     return p.length ? p.join("") : `<i class="plate none"></i>`;
   };
   const weekHtml = `<div class="week animate" aria-label="What you logged each day this week">${days.map((d) => {
@@ -211,7 +228,7 @@ async function renderToday() {
     const letters = parseYmd(d).toLocaleDateString(undefined, { weekday: "short" });
     return `<div class="day ${cls}"><div class="plates">${plates(d)}</div><span class="dow">${esc(letters)}</span><span class="dnum">${parseYmd(d).getDate()}</span></div>`;
   }).join("")}</div>
-  <div class="legend"><span style="--c:var(--lift)">Lifting</span><span style="--c:var(--cardio)">Cardio</span><span style="--c:var(--diet)">Diet</span><span style="--c:var(--body)">Body</span></div>`;
+  <div class="legend"><span style="--c:var(--lift)">Lifting</span><span style="--c:var(--cardio)">Cardio</span><span style="--c:var(--diet)">Diet</span><span style="--c:var(--body)">Body</span><span style="--c:var(--code)">Coding</span></div>`;
 
   // stats
   const trainDays = new Set([...week.workouts.map((l) => l.date), ...week.cardio.map((c) => c.date)]).size;
@@ -219,6 +236,9 @@ async function renderToday() {
   for (const w of week.workouts) { const s = workoutStats(w); sets += s.sets; volume += s.volume; }
   const cardioMin = week.cardio.reduce((m, c) => m + (c.minutes || 0), 0);
   const cardioKm = week.cardio.reduce((m, c) => m + (c.distance_km || 0), 0);
+  const codeHours = (week.coding || []).reduce((m, c) => m + (c.minutes || 0), 0) / 60;
+  const codeDays = new Set((week.coding || []).map((c) => c.date)).size;
+  const codeGoal = Number(S.settings.coding_goal) || null;
   const dietDays = {};
   for (const m of week.meals) {
     const d = (dietDays[m.date] ||= { p: 0, n: 0 });
@@ -233,6 +253,8 @@ async function renderToday() {
     <div class="stat" style="--c:var(--cardio)"><div class="v">${fmt(cardioMin, 0)}<small>min</small></div><div class="k">Cardio${cardioKm ? `, ${fmt(cardioKm, 1)} km` : ""}</div></div>
     <div class="stat" style="--c:var(--diet)"><div class="v">${avgP != null ? fmt(avgP, 0) : "–"}<small>g</small></div><div class="k">Avg protein a day${pTarget ? ` of ${pTarget}` : ""}</div>
       ${pTarget && avgP != null ? `<div class="bar"><i style="width:${Math.min(100, (avgP / pTarget) * 100)}%"></i></div>` : ""}</div>
+    <div class="stat wide" style="--c:var(--code)"><div class="v">${fmt(codeHours, 1) || "0"}<small>h</small></div><div class="k">Coding this week${codeDays ? `, on ${codeDays} ${codeDays === 1 ? "day" : "days"}` : ""}${codeGoal ? `, goal ${fmt(codeGoal)} h` : ""}</div>
+      ${codeGoal ? `<div class="bar"><i style="width:${Math.min(100, (codeHours / codeGoal) * 100)}%"></i></div>` : ""}</div>
   </div>`;
 
   const startCard = activeWorkout() ? "" : `<button type="button" class="start-card" id="startWk">
@@ -256,7 +278,7 @@ async function renderToday() {
   }
 
   // today's log
-  const todays = flatten({ workouts: week.workouts.filter((e) => e.date === t), cardio: week.cardio.filter((e) => e.date === t), meals: week.meals.filter((e) => e.date === t), body: week.body.filter((e) => e.date === t) });
+  const todays = flatten(Object.fromEntries(Object.keys(TYPE).map((tp) => [tp, (week[tp] || []).filter((e) => e.date === t)])));
   const todayHtml = `<h2 class="section">Logged today</h2>` + (todays.length
     ? `<div class="list">${todays.map((it) => rowHtml(it.type, it.e)).join("")}</div>`
     : `<div class="list"><div class="empty"><strong>Nothing yet today</strong>Tap + to log a workout, a run, a meal or a weigh-in.</div></div>`);
@@ -284,7 +306,7 @@ async function renderHistory() {
   const seg = `<div class="seg" role="group" aria-label="View">
       <button type="button" aria-pressed="true">Log</button>
       <button type="button" aria-pressed="false" data-go="#/history/progress">Progress</button></div>`;
-  const filters = [["all", "All"], ["workouts", "Workouts"], ["cardio", "Cardio"], ["meals", "Diet"], ["body", "Body"]];
+  const filters = [["all", "All"], ["workouts", "Workouts"], ["cardio", "Cardio"], ["meals", "Diet"], ["body", "Body"], ["coding", "Coding"]];
   const chips = `<div class="chips" style="margin-top:14px">${filters.map(([k, label]) =>
     `<button type="button" class="chip" data-filter="${k}" aria-pressed="${S.historyFilter === k}">${label}</button>`).join("")}</div>`;
   view.innerHTML = head("History") + seg + chips + loading();
@@ -310,7 +332,7 @@ async function renderProgress() {
       <button type="button" aria-pressed="false" data-go="#/history">Log</button>
       <button type="button" aria-pressed="true">Progress</button></div>`;
   view.innerHTML = head("History") + seg + loading();
-  const [exercises, bodyHist] = await Promise.all([loadExercises(true), api("GET", "/body-history")]);
+  const [exercises, bodyHist, codingHist] = await Promise.all([loadExercises(true), api("GET", "/body-history"), api("GET", "/coding-history")]);
   if (!fresh()) return;
 
   let liftHtml = `<h2 class="section">Exercises</h2><div class="list"><div class="empty"><strong>No workouts yet</strong>Log a workout and each exercise's progress shows up here.</div></div>`;
@@ -343,13 +365,43 @@ async function renderProgress() {
     : `<div class="list"><div class="empty"><strong>Not enough weigh-ins</strong>Log your weight on two different days to see the trend.</div></div>`) +
     (waist.length >= 2 ? `<h2 class="section">Waist</h2><div class="card">${lineChart(waist, { color: "var(--body)", suffix: " cm" })}</div>` : "");
 
-  view.innerHTML = head("History") + seg + liftHtml + bodyHtml;
+  view.innerHTML = head("History") + seg + liftHtml + bodyHtml + codingProgress(codingHist);
   $$("[data-key]").forEach((b) => b.addEventListener("click", () => { S.progressKey = b.dataset.key; renderProgress(); }));
   $("[data-key][aria-pressed=true]")?.scrollIntoView({ inline: "center", block: "nearest" });
   $("#exAbout")?.addEventListener("click", () => {
     const cur = exercises.find((e) => e.key === S.progressKey);
     openExerciseDetail({ id: cur.exercise_id, name: cur.exercise, kind: cur.kind });
   });
+}
+
+// Consecutive days with coding logged. Not having logged today yet doesn't break the streak.
+function codingStreak(rows, t) {
+  const days = new Set(rows.map((r) => r.date));
+  let d = days.has(t) ? t : addDays(t, -1), n = 0;
+  while (days.has(d)) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+// Hours per week, from the first logged week (at most 26 weeks back) to this week, with quiet weeks shown as zero.
+function codingProgress(rows) {
+  const title = `<h2 class="section">Coding</h2>`;
+  if (!rows.length) return title + `<div class="list"><div class="empty"><strong>No coding logged yet</strong>After a Python session, tap + and choose Coding.</div></div>`;
+  const t = today(), thisWeek = mondayOf(t);
+  const byWeek = new Map();
+  for (const r of rows) { const w = mondayOf(r.date); byWeek.set(w, (byWeek.get(w) || 0) + (r.minutes || 0) / 60); }
+  const pts = [];
+  for (let w = [mondayOf(rows[0].date), addDays(thisWeek, -7 * 25)].sort().at(-1); w <= thisWeek; w = addDays(w, 7)) {
+    pts.push({ x: w, y: Math.round((byWeek.get(w) || 0) * 10) / 10 });
+  }
+  const total = rows.reduce((h, r) => h + (r.minutes || 0), 0) / 60;
+  const problems = rows.reduce((n, r) => n + (r.problems || 0), 0);
+  const streak = codingStreak(rows, t);
+  const facts = [`since ${fmtShort(rows[0].date)}`, problems ? `${fmt(problems, 0)} problems solved` : "", streak > 1 ? `${streak}-day streak` : ""].filter(Boolean).join(", ");
+  return title + `<div class="card">
+      <div class="bignum">${fmt(total, 1)}<small> hours coded</small></div>
+      <div class="muted small">${esc(facts)}</div>
+      ${pts.length >= 2 ? lineChart(pts, { color: "var(--code)", suffix: " h" }) : `<p class="muted small">Keep logging and a weekly trend will appear here.</p>`}
+    </div>`;
 }
 
 async function renderPhotos() {
@@ -479,6 +531,7 @@ function renderSettings() {
       </div>
       <div class="grid2">
         <label class="field"><span>Goal weight</span><div class="unit-wrap"><input name="bodyweight_goal" inputmode="decimal" value="${esc(s.bodyweight_goal || "")}" placeholder="75"><em>${unit()}</em></div></label>
+        <label class="field"><span>Weekly coding goal</span><div class="unit-wrap"><input name="coding_goal" inputmode="decimal" value="${esc(s.coding_goal || "")}" placeholder="5"><em>hours</em></div></label>
         <div class="field"><span>Weight unit</span><div class="seg" role="group" aria-label="Weight unit" style="min-height:50px;align-items:center">
           <button type="button" data-unit="kg" aria-pressed="${unit() === "kg"}">kg</button><button type="button" data-unit="lb" aria-pressed="${unit() === "lb"}">lb</button></div></div>
       </div>
@@ -506,7 +559,7 @@ function renderSettings() {
       if (!(await confirmSheet(`Switch to ${chosenUnit}?`, `Convert my weights to ${chosenUnit}`, { subtitle: "Every weight you've logged will be converted.", danger: false }))) return;
     }
     try {
-      S.settings = await api("PUT", "/settings", { goal: f.get("goal"), calorie_target: f.get("calorie_target"), protein_target: f.get("protein_target"), bodyweight_goal: f.get("bodyweight_goal"), unit: chosenUnit });
+      S.settings = await api("PUT", "/settings", { goal: f.get("goal"), calorie_target: f.get("calorie_target"), protein_target: f.get("protein_target"), bodyweight_goal: f.get("bodyweight_goal"), coding_goal: f.get("coding_goal"), unit: chosenUnit });
       S.me.settings = S.settings;
       store.set("gymlog-me", S.me);
       toast("Settings saved");
@@ -600,6 +653,19 @@ async function renderForm(type, id) {
         <label class="field"><span>Protein</span><div class="unit-wrap"><input name="protein_g" inputmode="numeric" value="${esc(e.protein_g ?? "")}" placeholder="optional"><em>g</em></div></label>
       </div>
       <label class="field"><span>Notes</span><textarea name="notes" placeholder="Optional">${esc(e.notes || "")}</textarea></label>`;
+  } else if (type === "coding") {
+    const act = e.activity || "practice";
+    fields = `
+      <div class="field"><span>What you did</span><div class="seg" role="group" aria-label="What you did">${Object.entries(CODING_NAMES).map(([k, v]) => `<button type="button" data-activity="${k}" aria-pressed="${k === act}">${v}</button>`).join("")}</div></div>
+      <label class="field"><span>Topic</span><input name="topic" list="pyTopics" value="${esc(e.topic || "")}" placeholder="Loops, functions, pandas…" maxlength="120" autocapitalize="sentences"></label>
+      <datalist id="pyTopics">${PY_TOPICS.map((x) => `<option value="${esc(x)}">`).join("")}</datalist>
+      <div class="grid2">
+        <label class="field"><span>Time</span><div class="unit-wrap"><input name="minutes" inputmode="numeric" value="${esc(e.minutes ?? "")}" placeholder="45"><em>min</em></div></label>
+        <label class="field"><span>Problems solved</span><input name="problems" inputmode="numeric" value="${esc(e.problems ?? "")}" placeholder="optional"></label>
+      </div>
+      <label class="field"><span>Link</span><input name="link" type="url" inputmode="url" value="${esc(e.link || "")}" placeholder="GitHub, LeetCode or course (optional)" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+      ${e.link ? `<a class="more" href="${esc(e.link)}" target="_blank" rel="noopener noreferrer">Open link</a>` : ""}
+      <label class="field"><span>Notes</span><textarea name="notes" placeholder="What clicked, what's still confusing">${esc(e.notes || "")}</textarea></label>`;
   } else {
     fields = `
       <label class="field"><span>Body weight</span><div class="unit-wrap"><input name="weight" inputmode="decimal" value="${esc(e.weight ?? "")}" placeholder="75.0"><em>${unit()}</em></div></label>
@@ -635,6 +701,12 @@ async function renderForm(type, id) {
     }));
     form.activity.addEventListener("input", () => $$("[data-act]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.act === form.activity.value)));
   }
+
+  let codingActivity = e.activity || "practice";
+  $$("[data-activity]").forEach((b) => b.addEventListener("click", () => {
+    codingActivity = b.dataset.activity;
+    $$("[data-activity]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  }));
 
   let meal = e.meal || defaultMeal();
   $$("[data-meal]").forEach((b) => b.addEventListener("click", () => {
@@ -685,6 +757,11 @@ async function renderForm(type, id) {
       Object.assign(data, { meal, description: f.get("description"), calories: f.get("calories"), protein_g: f.get("protein_g") });
       const blank = (v) => !String(v ?? "").trim();
       if (blank(data.description) && blank(data.calories) && blank(data.protein_g) && !photoBlob && !photoKey) return toast("Describe the meal or add a photo.", true);
+    } else if (type === "coding") {
+      Object.assign(data, { activity: codingActivity, topic: f.get("topic"), minutes: f.get("minutes"), problems: f.get("problems"), link: f.get("link") });
+      if (!(toNum(data.minutes) > 0)) return toast("Add how many minutes you coded.", true);
+      const link = String(data.link || "").trim();
+      if (link && !/^https?:\/\//i.test(link)) return toast("Links must start with http:// or https://.", true);
     } else {
       Object.assign(data, { weight: f.get("weight"), body_fat: f.get("body_fat"), waist_cm: f.get("waist_cm") });
     }
@@ -784,8 +861,8 @@ const ROUTES = [
   [/^\/w\/(\d+)$/, (m) => renderWorkoutDetail(view, Number(m[1])), "history"],
   [/^\/w\/(\d+)\/edit$/, (m) => renderWorkoutEdit(view, Number(m[1])), null],
   [/^\/log\/lifts$/, () => { location.replace("#/"); startWorkout(); }, null],
-  [/^\/log\/(cardio|meals|body)$/, (m) => renderForm(m[1]), null],
-  [/^\/edit\/(cardio|meals|body)\/(\d+)$/, (m) => renderForm(m[1], Number(m[2])), null],
+  [/^\/log\/(cardio|meals|body|coding)$/, (m) => renderForm(m[1]), null],
+  [/^\/edit\/(cardio|meals|body|coding)\/(\d+)$/, (m) => renderForm(m[1], Number(m[2])), null],
 ];
 
 function showError(title, message, retry) {

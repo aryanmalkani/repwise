@@ -41,11 +41,12 @@ Each RepWise site has one password and one log, so it's built for one person. If
 
 **Everything else**
 - Cardio, meals with photos, calories and protein, weigh-ins and progress photos with side-by-side compare
+- A Python coding log: what you learned, practised or built, for how long, problems solved and links, with weekly hours, a streak and a trend chart
 - An AI coach that reviews your week every Sunday at 9 pm IST
 - Works offline in the gym: workouts save on the phone and upload when you're back online
 - Only you can log in. Photos are private and never sent to the AI.
 
-**Cost: $0/month for the site.** Cloudflare's free plan covers the website, the database (5 GB) and photo storage (10 GB). The AI coach is the only paid part: it uses your own OpenAI API credit, at about a tenth of a cent per weekly review.
+**Cost: $0/month for the site.** Cloudflare's free plan covers the website, the database (500 MB, plenty for text logs) and photo storage (10 GB). The AI coach is the only paid part: it uses your own OpenAI API credit, at about a tenth of a cent per weekly review.
 
 ---
 
@@ -125,6 +126,7 @@ Data you log here is stored only on your laptop (in the hidden `.wrangler` folde
 
 - **Start a workout:** tap **Start a workout** on Today, or **+ → Workout**. Search and tap exercises to select several, then **Add**.
 - **Log your diet:** tap **+ → Diet**, take or choose a food photo, and add calories and protein if you know them.
+- **Log coding:** after a Python session, tap **+ → Coding**. Set a weekly hours goal in Settings, and see your trend under **History → Progress**.
 - **Log a set:** type weight and reps, then tap the checkmark. If you leave them empty, checking the set uses what you did last time (shown in grey).
 - **Change set type:** tap the set number (1, 2, 3) to make it a Warm-up, Drop set or Failure set, or to remove it.
 - **Copy last time:** tap the grey **Previous** value.

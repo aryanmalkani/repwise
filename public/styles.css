@@ -12,6 +12,8 @@
   --cardio: #1D5FC4;
   --diet: #E2A400;
   --body: #1E8A4C;
+  --code: #6A4BE0;
+  --on-code: #FFFFFF;
   --on-color: #FFFFFF;
   --on-diet: #1C1500;
   --danger: #C8102E;
@@ -38,6 +40,8 @@
     --cardio: #5592F7;
     --diet: #F2BE2E;
     --body: #3DBF74;
+    --code: #A48FFF;
+    --on-code: #15102E;
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
   }
 }
@@ -146,6 +150,7 @@ h2.section a, h2.section button { font: 500 15px var(--text); color: var(--muted
 }
 .day {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 0;
   text-decoration: none;
   position: relative;
 }
@@ -153,9 +158,11 @@ h2.section a, h2.section button { font: 500 15px var(--text); color: var(--muted
   height: 76px;
   display: flex; align-items: center; justify-content: center; gap: 2px;
   margin-bottom: 18px;
+  align-self: stretch; min-width: 0; /* plates narrow on small phones instead of spilling into the next day */
 }
 .plate {
   width: 8px;
+  flex: 0 1 auto; min-width: 3px;
   border-radius: 3px;
   transform-origin: center;
 }
@@ -163,6 +170,7 @@ h2.section a, h2.section button { font: 500 15px var(--text); color: var(--muted
 .plate.cardio { background: var(--cardio); height: 60px; }
 .plate.meals  { background: var(--diet);   height: 46px; }
 .plate.body   { background: var(--body);   height: 34px; }
+.plate.coding { background: var(--code);  height: 22px; }
 .plate.none { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
 .day .dow { font-size: 13px; color: var(--muted); }
 .day .dnum { font: 600 20px/1 var(--num); }
@@ -199,6 +207,7 @@ h2.section a, h2.section button { font: 500 15px var(--text); color: var(--muted
 .stat .v { font: 600 34px/1 var(--num); letter-spacing: -0.01em; }
 .stat .v small { font: 500 18px var(--num); color: var(--muted); margin-left: 2px; }
 .stat .k { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.stat.wide { grid-column: 1 / -1; }
 .bar { height: 6px; border-radius: 3px; background: var(--surface-2); margin-top: 10px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--c); border-radius: 3px; }
 
@@ -348,6 +357,7 @@ form { display: grid; gap: 14px; }
 .t-cardio { --accent: var(--cardio); --on-accent: var(--on-color); }
 .t-meals  { --accent: var(--diet);   --on-accent: var(--on-diet); }
 .t-body   { --accent: var(--body);   --on-accent: var(--on-color); }
+.t-coding { --accent: var(--code);   --on-accent: var(--on-code); }
 
 .form-title { display: flex; align-items: center; gap: 12px; margin: 4px 0 18px; }
 .form-title h1 { font: 700 34px/1 var(--num); margin: 0; }
@@ -480,6 +490,7 @@ form { display: grid; gap: 14px; }
 }
 
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choices .wide { grid-column: 1 / -1; }
 .choice {
   display: grid; gap: 4px; align-content: end;
   padding: 56px 14px 14px; /* keeps the text clear of the colour bar, however it wraps */
